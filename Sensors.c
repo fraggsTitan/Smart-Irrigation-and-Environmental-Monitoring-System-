@@ -3,21 +3,22 @@
 //Libraries
 #include <Arduino.h>
 #include <Wire.h>
-#include <Adafruit_Sensor.h>
-#include <Adafruit_BME280.h>
 #include <LiquidCrystal_I2C.h>
+#include <DHT.h>
 
 // Pin Configurations Macros
 #define SOIL_PIN 34
 #define LED_PIN 26
+#define DHT_PIN 25          // choose your pin where DHT22 is connected
+#define DHT_TYPE DHT22
 
 // Thresholds
-int SOIL_THRESHOLD =2000;
-int  TEMP_THRESHOLD =30;
-int  HUM_THRESHOLD =70;
+int SOIL_THRESHOLD = 2000;
+int TEMP_THRESHOLD = 30;
+int HUM_THRESHOLD  = 70;
 
 // Globals
-Adafruit_BME280 bme;
+DHT dht(DHT_PIN, DHT_TYPE);
 float temperature = 0, humidity = 0;
 int soilMoisture = 0;
 int ledState = 0;
@@ -27,20 +28,27 @@ void initSensors();
 void readSensors();
 void controlLogic(LiquidCrystal_I2C &lcd);
 
-//checks for BME and either successfully turns it on or sends error
+// Initialize sensors (DHT + LED)
 void initSensors() {
-  if (!bme.begin(0x76)) {
-    Serial.println("Could not find BME280 sensor!");
-    while (1);
-  }
-pinMode(LED_PIN, OUTPUT);
+  dht.begin();
+
+  pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
+
+  Serial.println("DHT22 + Soil Sensor initialized");
 }
-//reads temperature,humidity,soilMoisture and accordingly sets the global vars while also printing value to console
+
+// Read temperature, humidity, soilMoisture and set globals
 void readSensors() {
-  temperature = bme.readTemperature();
-  humidity = bme.readHumidity();
+  temperature = dht.readTemperature();
+  humidity    = dht.readHumidity();
   soilMoisture = analogRead(SOIL_PIN);
+
+  // Basic check for NaN (sometimes DHT fails)
+  if (isnan(temperature) || isnan(humidity)) {
+    Serial.println("Failed to read from DHT sensor!");
+    return;
+  }
 
   Serial.print("Temp: "); Serial.println(temperature);
   Serial.print("Humidity: "); Serial.println(humidity);
