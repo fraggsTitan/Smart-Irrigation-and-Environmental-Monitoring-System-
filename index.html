@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Smart Irrigator Dashboard</title>
+  <style>
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      padding: 20px;
+      background: #eaf4ec;
+      color: #2c3e50;
+    }
+
+    h1 {
+      color: #2c3e50;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    form, #data {
+      background: #fff;
+      border-radius: 10px;
+      padding: 20px;
+      margin: 20px auto;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      max-width: 500px;
+    }
+
+    h3 {
+      margin-top: 0;
+      color: #27ae60;
+    }
+
+    label {
+      display: block;
+      margin-top: 12px;
+      font-weight: 500;
+    }
+
+    input, select {
+      margin-top: 5px;
+      width: 100%;
+      padding: 8px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+
+    button {
+      margin-top: 15px;
+      padding: 10px 15px;
+      background: #27ae60;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #219150;
+    }
+
+    #sensorData {
+      background: #f9f9f9;
+      padding: 12px;
+      border-radius: 5px;
+      border: 1px solid #ddd;
+      max-height: 250px;
+      overflow-y: auto;
+      font-family: monospace;
+    }
+
+    #ipForm div {
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+
+    #ip {
+      width: calc(100% - 10px);
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 30px;
+      font-size: 13px;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <h1>🌱 Smart Irrigator Dashboard</h1>
+
+  <form id="ipForm">
+    <div>Enter your ESP32 IP:</div>
+    <input type="text" id="ip" placeholder="e.g. 192.168.1.50" />
+    <button type="submit">Set IP</button>
+  </form>
+
+  <div id="data">
+    <h3>Live Sensor Data</h3>
+    <pre id="sensorData">Loading...</pre>
+  </div>
+
+  <form id="thresholdForm">
+    <h3>Update Thresholds</h3>
+    <label>Soil Threshold: <input type="number" id="soil" placeholder="e.g. 2500" /></label>
+    <label>Temp Threshold: <input type="number" id="temp" placeholder="e.g. 32" /></label>
+    <label>Humidity Threshold: <input type="number" id="hum" placeholder="e.g. 75" /></label>
+    <label>
+      Pump State:
+      <select id="pump">
+        <option value="">--unchanged--</option>
+        <option value="true">On</option>
+        <option value="false">Off</option>
+      </select>
+    </label>
+    <button type="submit">Update Thresholds</button>
+  </form>
+
+  <div class="footer">Smart Irrigator © 2025</div>
+
+  <script>
+    let ESP32_IP = localStorage.getItem("esp32_ip") || "http://192.168.1.50";
+
+    // Fetch live sensor + threshold data
+    async function fetchData() {
+      try {
+        const res = await fetch(`${ESP32_IP}/setThresholds`);
+        const json = await res.json();
+        document.getElementById("sensorData").textContent = JSON.stringify(json, null, 2);
+      } catch (err) {
+        document.getElementById("sensorData").textContent = "⚠️ Error fetching data";
+      }
+    }
+
+    // Auto-refresh data every 5s
+    setInterval(fetchData, 5000);
+    fetchData();
+
+    // Handle threshold update form
+    document.getElementById("thresholdForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const body = {};
+
+      if (document.getElementById("soil").value) body.soil = parseInt(document.getElementById("soil").value);
+      if (document.getElementById("temp").value) body.temp = parseInt(document.getElementById("temp").value);
+      if (document.getElementById("hum").value) body.hum = parseInt(document.getElementById("hum").value);
+      if (document.getElementById("pump").value) body.pump = (document.getElementById("pump").value === "true");
+
+      try {
+        const res = await fetch(`${ESP32_IP}/updateThresholds`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+        const text = await res.text();
+        alert("Server says: " + text);
+        fetchData();
+      } catch (err) {
+        alert("⚠️ Failed to update thresholds");
+      }
+    });
+
+    document.getElementById("ipForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      ESP32_IP = "http://" + document.getElementById("ip").value.trim();
+      localStorage.setItem("esp32_ip", ESP32_IP);
+      alert("✅ ESP32 IP saved: " + ESP32_IP);
+      fetchData();
+    });
+  </script>
+</body>
+</html>
+
+
