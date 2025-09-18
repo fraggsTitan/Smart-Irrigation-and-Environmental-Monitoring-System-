@@ -54,7 +54,8 @@ void readSensors() {
   Serial.print("Humidity: "); Serial.println(humidity);
   Serial.print("Soil: "); Serial.println(soilMoisture);
 }
-
+unsigned long pumpStartTime = 0;
+bool pumpActive = false;
 //this is all the logic that controls LCD display and also the pump control
 void controlLogic(LiquidCrystal_I2C &lcd) {
     lcd.clear();//try to operate on this if you want to avoid flickering
@@ -68,8 +69,7 @@ void controlLogic(LiquidCrystal_I2C &lcd) {
     int soilPercent = map(soilMoisture, 0, 4095, 0, 100);
 
     // static variables
-    static unsigned long pumpStartTime = 0;
-    static bool pumpActive = false;
+
 
     if (!pumpActive) {
         //checks if pump should be turned on or LED here
