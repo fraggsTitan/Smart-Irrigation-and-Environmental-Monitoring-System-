@@ -11,6 +11,8 @@ extern int soilMoisture, ledState;
 extern int SOIL_THRESHOLD;
 extern int TEMP_THRESHOLD;
 extern int HUM_THRESHOLD;
+extern unsigned long pumpStartTime;
+extern bool pumpActive;
 //function prototype of the functions defined in sensors.c
 void initSensors();
 void readSensors();
@@ -46,6 +48,10 @@ void handleUpdateThresholds() {
     if (doc.containsKey("soil")) SOIL_THRESHOLD = doc["soil"];
     if (doc.containsKey("temp")) TEMP_THRESHOLD = doc["temp"];
     if (doc.containsKey("hum")) HUM_THRESHOLD = doc["hum"];
+    if(doc.containsKey("pump")){
+        pumpActive=doc["pump"];
+        pumpStartTime=0;
+    }
     //sends success response
     server.send(200, "text/plain", "Thresholds updated");
     /* Sample HTTP request from postman
@@ -59,7 +65,30 @@ void handleUpdateThresholds() {
         }
     */
 }
+void handleGetThresholds() {
+    StaticJsonDocument<300> doc;
 
+    // Add sensor values
+    doc["temperature"] = temperature;
+    doc["humidity"] = humidity;
+    doc["soilMoisture"] = soilMoisture;
+    doc["ledState"] = ledState;
+
+    // Add thresholds
+    doc["SOIL_THRESHOLD"] = SOIL_THRESHOLD;
+    doc["TEMP_THRESHOLD"] = TEMP_THRESHOLD;
+    doc["HUM_THRESHOLD"] = HUM_THRESHOLD;
+
+    // Add pump info
+    doc["pumpActive"] = pumpActive;
+    doc["pumpStartTime"] = pumpStartTime;
+
+    // Convert JSON to string
+    String response;
+    serializeJson(doc, response);
+
+    server.send(200, "application/json", response);
+}
 void setup() {
   //begins connection  on port 115200
   Serial.begin(115200);
@@ -85,6 +114,40 @@ void setup() {
   Serial.print("ESP32 IP: ");
   Serial.println(WiFi.localIP());
   server.on("/updateThresholds", HTTP_POST, handleUpdateThresholds);
+  server.on("/setThresholds",HTTP_GET,handleGetThresholds);
   server.begin();
   Serial.println(" Server is Ready to accept requests!");
+}
+
+void loop() {
+  //reads data from console and prints to console
+  readSensors();
+  //calls controllogic function from sensors to implement functionality of app
+  controlLogic(lcd);
+  //handles POST requests from client
+  server.handleClient();
+  if (WiFi.status() == WL_CONNECTED) {
+
+    HTTPClient http;
+    http.begin(thing_server);
+    //gets connection to the API
+    //After that attempts to post the data to thingspeak
+    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+    String postData = "api_key=" + String(apiKey) +
+                      "&field1=" + String(temperature) +
+                      "&field2=" + String(humidity) +
+                      "&field3=" + String(soilMoisture) +
+                      "&field4=" + String(ledState);
+    //posts and gets response to show success/failure
+    int httpCode = http.POST(postData);
+    if (httpCode > 0) {
+      Serial.println("Data sent to ThingSpeak (POST)");
+    } else {
+      Serial.println("Error sending data");
+    }
+    http.end();
+  }
+
+  delay(20000); // ThingSpeak minimum is 20 seconds for every request
 }
